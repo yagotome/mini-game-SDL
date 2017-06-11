@@ -4,7 +4,6 @@
 #include <stdio.h>
 
 #define FPS 30
-#define SONIC_AMOUNT 19
 
 void load();
 void onExit(const SDL_Event *event);
