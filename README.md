@@ -3,11 +3,17 @@
 
 To play the game, run:
 ```
-$ gcc main.c -lSDL2 -lSDL2_image -lSDL2_mixer -o "Sonic, jump!"
-$ ./"Sonic, jump!"
+$ make
 ```
 
-Remembering that you must have SDL installed:
+You'll find the executable game in _bin_ folder. Therefore, you could also run:
+```
+$ make install
+$ cd bin
+$ ./'Sonic, jump!'
+```
+
+Remember you must have SDL installed:
 ```
 $ sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libsdl2-net-dev libsdl2-gfx-dev
 ```

@@ -13,9 +13,9 @@ int main()
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 	Mix_Music *bgm;
 	Mix_Chunk *jump, *crash;
-	bgm = Mix_LoadMUS("../mp3/sonic_theme.mp3");
-	jump = Mix_LoadWAV("../mp3/jump.wav");
-	crash = Mix_LoadWAV("../mp3/crash.wav");
+	bgm = Mix_LoadMUS("../audio/sonic_theme.mp3");
+	jump = Mix_LoadWAV("../audio/jump.wav");
+	crash = Mix_LoadWAV("../audio/crash.wav");
 
 	SDL_Texture *background, *ground, *obstacle, *sonic_01, *sonic_02, *sonic_03, *sonic_04, *sonic_05, *sonic_06, *sonic_07, *sonic_08, *sonic_09, *sonic_10, *sonic_11, *sonic_12, *sonic_13, *sonic_14, *sonic_15, *sonic_16, *sonic_17, *sonic_18, *sonic_19;
 	SDL_Rect body_background = {0, 0, 1280, 330}, body_ground = {0, 330, 1280, 150}, body_sonic = {80, 235, 82, 100};	
