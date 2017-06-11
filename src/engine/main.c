@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include "game.h"
 
+int timeToFinish = 0;
+
+void finish(int delay) {
+	timeToFinish = SDL_GetTicks() + delay;
+}
+
 int main()
 {
 	load();
@@ -43,6 +49,12 @@ int main()
 
 		dt = SDL_GetTicks() - time;
 		time = SDL_GetTicks();
+
+		if (timeToFinish && time >= timeToFinish)
+		{
+			onExit();
+			return 0;
+		}
 
 		update(dt);
 		draw();
