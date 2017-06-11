@@ -1,12 +1,14 @@
 # Sonic, jump!
 ## SDL Mini Project
 
+### For Linux users:
+
 To play the game, run:
 ```
 $ make
 ```
 
-You'll find the executable game in _bin_ folder. Therefore, you could also run:
+Then, you'll find the executable game in _bin_ folder. Therefore, you could instead run:
 ```
 $ make install
 $ cd bin
@@ -19,5 +21,5 @@ $ sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-t
 ```
 
 ### Developed by:
-* Lucas Alves de Sousa
-* Yago Gomes Tomé de Sousa
+* [Lucas Alves](https://github.com/lucascomp)
+* [Yago Tomé](https://github.com/yagotome)
