@@ -3,7 +3,7 @@
 #include <SDL2/SDL_mixer.h>
 #include <stdio.h>
 
-#define FPS 30
+#define FPS 60
 
 void load();
 void onExit();

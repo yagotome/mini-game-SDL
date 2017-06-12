@@ -14,10 +14,11 @@ SDL_Rect body_background = {0, 0, 1280, 330},
 		 body_sonic = {80, 235, 82, 100};
 SDL_Texture *background, *ground, *obstacle, *sonic[SONIC_AMOUNT];
 
-int obstacle_amount = 0, obstacle_time = 0, new_obstacles_index = 0;;
+int obstacle_amount = 0, obstacle_time = 0, new_obstacles_index = 0;
 SDL_Rect *body_obstacles, obstacle_initial_position = {640, 255, 60, 80};
 
-int g_speed = -10, bg_speed = -1, jump_speed = -12, stage = 1, sonic_sprite = 0, game_speed = 1;
+int g_speed = -50, bg_speed = -5, jump_speed = -80, stage = 1, sonic_sprite = 0, game_speed = 1,
+	stage_time = 0, jump_time = 0, sonic_time = 0;
 
 bool is_jumping = false, is_falling = false;
 
@@ -50,6 +51,10 @@ void load()
 
 void onExit()
 {
+	free(background);
+	free(ground);
+	free(obstacle);
+	int i; for (i = 0; i < SONIC_AMOUNT; i++) free(sonic[i]);
 	Mix_HaltMusic();
 	Mix_FreeMusic(bgm);
 	Mix_Quit();
@@ -68,12 +73,12 @@ void onKeyDown(const SDL_Event *e)
 
 void move_x(SDL_Rect *r, const int speed, const int dt)
 {
-	r->x += game_speed * (int)round(speed * (float)FPS / dt);
+	r->x += (int)round(speed*0.01 * dt);
 }
 
 void move_y(SDL_Rect *r, const int speed, const int dt)
 {
-	r->y += game_speed * (int)round(speed * (float)FPS / dt);
+	r->y += (int)round(speed*0.01 * dt);
 }
 
 bool is_colliding(SDL_Rect *rect1, SDL_Rect* rect2)
@@ -103,6 +108,32 @@ void update(const Uint32 dt)
 	else
 		move_x(&body_ground, g_speed, dt);
 
+	// moving sonic
+	sonic_time += dt;
+	if (sonic_time > 50)
+	{		
+		if (is_jumping)
+		{
+			sonic_sprite = 12 + ((sonic_sprite + 1) % 7);
+		}
+		else
+		{
+			switch (stage)
+			{
+			case 1:
+				sonic_sprite = (sonic_sprite + 1) % 8;
+				break;
+			case 2:
+				sonic_sprite = 8 + ((sonic_sprite + 1) % 4);
+				break;
+			case 3:
+				sonic_sprite = 12 + ((sonic_sprite + 1) % 7);
+				break;
+			}
+		}
+		sonic_time = 0;
+	}
+
 	// make sonic jump
 	if (is_jumping)
 	{
@@ -114,7 +145,11 @@ void update(const Uint32 dt)
 		{
 			if (!is_falling)
 				is_falling = true;
-			move_y(&body_sonic, -jump_speed, dt);
+			jump_time += dt;
+			if (jump_time > 400)
+			{
+				move_y(&body_sonic, -jump_speed, dt);
+			}
 		}
 
 		if (body_sonic.y >= 235 && (stage == 1 || stage == 2))
@@ -122,12 +157,14 @@ void update(const Uint32 dt)
 			body_sonic.y = 235;
 			is_jumping = false;
 			is_falling = false;
+			jump_time = 0;
 		}
 		else if (body_sonic.y >= 255 && stage == 3)
 		{
 			body_sonic.y = 255;
 			is_jumping = false;
 			is_falling = false;
+			jump_time = 0;
 		}
 	}
 
@@ -147,7 +184,7 @@ void update(const Uint32 dt)
 
 	// creating new obstacles
 	obstacle_time += dt;
-	if (obstacle_time > 1000 && (rand() % 100) == 0)
+	if (obstacle_time > 1000 - 20*game_speed && (rand() % 50) == 0)
 	{		
 		if (obstacle_amount < 5)
 			body_obstacles = (SDL_Rect *)realloc(body_obstacles, (++obstacle_amount) * sizeof(SDL_Rect));			
@@ -162,16 +199,24 @@ void update(const Uint32 dt)
 		// 		body_obstacles[i].h);
 	}
 
-	Uint32 time = SDL_GetTicks();
-	if (time > 30 * 1000 && time < 50 * 1000 && stage == 1)
+
+	stage_time += dt;
+	if (stage_time > 7000)
 	{
-		stage = 2;
+		bg_speed -= 5;
+		g_speed -= 5;
+		stage_time = 0;
 		game_speed++;
 	}
-	else if (time > 50 * 1000 && stage == 2)
+
+	Uint32 time = SDL_GetTicks();
+	if (time > 40 * 1000 && time < 70 * 1000 && stage == 1)
+	{
+		stage = 2;
+	}
+	else if (time > 70 * 1000 && stage == 2)
 	{
 		stage = 3;
-		game_speed++;
 		body_sonic.x = 82;
 		body_sonic.y = 255;
 		body_sonic.w = 80;
@@ -183,34 +228,11 @@ void draw()
 {
 	SDL_RenderCopy(renderer, background, NULL, &body_background);
 	SDL_RenderCopy(renderer, ground, NULL, &body_ground);
-
-	if (is_jumping)
-	{
-		sonic_sprite = 12 + ((sonic_sprite + 1) % 7);
-	}
-	else
-	{
-		switch (stage)
-		{
-		case 1:
-			sonic_sprite = (sonic_sprite + 1) % 8;
-			break;
-		case 2:
-			sonic_sprite = 8 + ((sonic_sprite + 1) % 4);
-			break;
-		case 3:
-			sonic_sprite = 12 + ((sonic_sprite + 1) % 7);
-			break;
-		}
-	}
 	SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &body_sonic);
-
 	int i;
 	for (i = 0; i < obstacle_amount; i++)
 	{
 		SDL_RenderCopy(renderer, obstacle, NULL, &body_obstacles[i]);
-		// SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &body_obstacles[i]);
 	}
-
 	SDL_RenderPresent(renderer);
 }
