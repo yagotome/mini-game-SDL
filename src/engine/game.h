@@ -1,13 +1,13 @@
+/*
+----Universidade do Estado do Rio de Janeiro--------------------
+----Sistemas Reativos-------------------------------------------
+----Mini-projeto: Sonic, jump!----------------------------------
+----Autores: Lucas Alves de Sousa & Yago Gomes Tomé de Sousa----
+*/
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_mixer.h>
-#include <stdio.h>
 
-#define FPS 60
-
-void load();
-void onExit();
-void onKeyDown(const SDL_Event *event);
-void update(const Uint32 dt);
-void draw();
-void finish(int delay);
+void loadGame();
+void updateGame(Uint32 dt);
