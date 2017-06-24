@@ -21,7 +21,7 @@ const float background_speed = 50.0, background_acceleration = 2.0, ground_speed
 float i_background = 0.0, i_ground = 0.0, i_jump = 0.0, actual_speed_y = 0.0, actual_acceleration_y = 0.0, sprite_time = 0.0;
 const int obstacle_distance = 400, stage_time = 10;
 int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
-bool is_finishing = false, is_jumping = false;
+bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false;
 
 Uint32 time;
 
@@ -98,20 +98,29 @@ void keyDown(const SDL_Event *event)
 	}
 	else if (event->type == SDL_KEYDOWN)
 	{
-		if (event->key.keysym.sym == SDLK_UP && !is_jumping)
+		if (event->key.keysym.sym == SDLK_UP)
 		{
-			is_jumping = true;
-			i_jump = 0;
-			actual_speed_y = initial_speed_y;
-			actual_acceleration_y = initial_acceleration_y;
-			sonic_body.w = 80;
-			sonic_body.h = 80;
-			sonic_body.y = 234;
-			Mix_PlayChannel(-1, sound_jump, 0);
+			if (!is_jumping)
+			{
+				is_jumping = true;
+				i_jump = 0;
+				actual_speed_y = initial_speed_y;
+				actual_acceleration_y = initial_acceleration_y;
+				sonic_body.w = 80;
+				sonic_body.h = 80;
+				sonic_body.y = 234;
+				Mix_PlayChannel(-1, sound_jump, 0);
+			}
+			else if(is_dropping)
+			{
+				actual_acceleration_y = -200;
+				low_drop = true;
+			}
 		}
 		else if (event->key.keysym.sym == SDLK_DOWN && is_jumping)
 		{
 			actual_acceleration_y = -10000.0;
+			fast_drop = true;
 		}
 	}
 }
@@ -140,6 +149,7 @@ void updateGame(Uint32 dt)
 		time = SDL_GetTicks();
 		if (SDL_PollEvent(&event))
 		{
+			low_drop = false;
 			keyDown(&event);
 		}
 	
@@ -157,6 +167,9 @@ void updateGame(Uint32 dt)
 		{
 			i_jump += actual_speed_y * (dt/1000.0);
 			actual_speed_y += actual_acceleration_y * (dt/1000.0);
+			
+			if (actual_speed_y < 0) is_dropping = true;
+
 			if (i_jump > 1 || i_jump < 1)
 			{
 				sonic_body.y -= (int)i_jump;
@@ -165,10 +178,16 @@ void updateGame(Uint32 dt)
 			if (sonic_body.y >= 255)
 			{
 				is_jumping = false;
+				if (fast_drop) fast_drop = false;
+				if (low_drop) low_drop = false;
+				if (is_dropping) is_dropping = false;
 				sonic_body.w = 82;
 				sonic_body.h = 100;
 				sonic_body.y = 235;
 			}	
+			if (!fast_drop && !low_drop) {
+				actual_acceleration_y = initial_acceleration_y;
+			}
 		}
 
 		/* CRIA NOVO OBSTÁCULO A CADA <obstacle_distance> PIXELS DE DISTÂNCIA */
