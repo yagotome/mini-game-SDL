@@ -8,13 +8,16 @@
 #include "engine/game.h"
 
 #define SONIC_AMOUNT 19
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 480
 
-typedef enum { false, true } bool;
+typedef enum { false,
+			   true } bool;
 
 struct SDL_Rect_Chained
 {
 	SDL_Rect body;
-	struct SDL_Rect_Chained *next; 
+	struct SDL_Rect_Chained *next;
 };
 
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 750.0, initial_acceleration_y = -1300.0;
@@ -23,26 +26,23 @@ const int obstacle_distance = 400, stage_time = 10;
 int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
 bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false;
 
-Uint32 time;
-
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Rect background_body = {0, 0, 1280, 330}, ground_body = {0, 330, 1280, 150}, sonic_body = {80, 235, 82, 100};
 struct SDL_Rect_Chained *obstacles_list;
 SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle;
-SDL_Event event;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
 
-void loadGame()
+void load()
 {
 	SDL_Init(SDL_INIT_EVERYTHING);
-	window = SDL_CreateWindow("Sonic, jump!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL_WINDOW_SHOWN);
-	renderer = SDL_CreateRenderer(window,-1,0);
-	obstacles_list = (struct SDL_Rect_Chained *) malloc(sizeof(struct SDL_Rect_Chained *));
+	window = SDL_CreateWindow("Sonic, jump!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+	renderer = SDL_CreateRenderer(window, -1, 0);
+	obstacles_list = (struct SDL_Rect_Chained *)malloc(sizeof(struct SDL_Rect_Chained));
 	obstacles_list->next = NULL;
 	(obstacles_list->body).x = 640;
-	(obstacles_list->body).y = 255;				
+	(obstacles_list->body).y = 255;
 	(obstacles_list->body).w = 60;
 	(obstacles_list->body).h = 80;
 	background = IMG_LoadTexture(renderer, "../img/background.jpg");
@@ -63,10 +63,9 @@ void loadGame()
 	Mix_VolumeChunk(sound_crash, 30);
 	Mix_VolumeMusic(35);
 	Mix_PlayMusic(bgm, -1);
-	time = SDL_GetTicks();
 }
 
-void exitGame()
+void onExit()
 {
 	free(background);
 	free(ground);
@@ -90,201 +89,185 @@ void exitGame()
 	SDL_Quit();
 }
 
-void keyDown(const SDL_Event *event)
+void onKeyDown(const SDL_Event *event)
 {
-	if (event->type == SDL_QUIT)
+	if (event->key.keysym.sym == SDLK_UP)
 	{
-		exitGame();
+		if (!is_jumping)
+		{
+			is_jumping = true;
+			i_jump = 0;
+			actual_speed_y = initial_speed_y;
+			actual_acceleration_y = initial_acceleration_y;
+			sonic_body.w = 80;
+			sonic_body.h = 80;
+			sonic_body.y = 234;
+			Mix_PlayChannel(-1, sound_jump, 0);
+		}
+		else if (is_dropping)
+		{
+			actual_acceleration_y = -200;
+			low_drop = true;
+		}
 	}
-	else if (event->type == SDL_KEYDOWN)
+	else if (event->key.keysym.sym == SDLK_DOWN && is_jumping)
 	{
-		if (event->key.keysym.sym == SDLK_UP)
-		{
-			if (!is_jumping)
-			{
-				is_jumping = true;
-				i_jump = 0;
-				actual_speed_y = initial_speed_y;
-				actual_acceleration_y = initial_acceleration_y;
-				sonic_body.w = 80;
-				sonic_body.h = 80;
-				sonic_body.y = 234;
-				Mix_PlayChannel(-1, sound_jump, 0);
-			}
-			else if(is_dropping)
-			{
-				actual_acceleration_y = -200;
-				low_drop = true;
-			}
-		}
-		else if (event->key.keysym.sym == SDLK_DOWN && is_jumping)
-		{
-			actual_acceleration_y = -10000.0;
-			fast_drop = true;
-		}
+		actual_acceleration_y = -10000.0;
+		fast_drop = true;
 	}
 }
 
-void drawGame()
+void onKeyUp(const SDL_Event *event)
+{
+	if (event->key.keysym.sym == SDLK_UP)
+	{
+		low_drop = false;
+	}
+}
+
+void update(Uint32 dt,  Uint32 time)
+{
+	if (is_finishing) return;
+
+	/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
+	struct SDL_Rect_Chained *first_obstacle;
+	first_obstacle = obstacles_list;
+	if ((first_obstacle->body).x <= 155 && (first_obstacle->body).x >= 30)
+	{
+		if (!is_jumping || (first_obstacle->body).y <= sonic_body.y + 75)
+		{
+			Mix_PlayChannel(-1, sound_crash, 0);
+			Mix_VolumeMusic(15);
+			is_finishing = true;
+			finishTimeout(2000);
+			return;
+		}
+	}
+
+	/* ATUALIZA POSIÇÃO Y DO SONIC NO PULO */
+	if (is_jumping)
+	{
+		i_jump += actual_speed_y * (dt / 1000.0);
+		actual_speed_y += actual_acceleration_y * (dt / 1000.0);
+
+		if (actual_speed_y < 0)
+			is_dropping = true;
+
+		if (i_jump > 1 || i_jump < 1)
+		{
+			sonic_body.y -= (int)i_jump;
+			i_jump -= (int)i_jump;
+		}
+		if (sonic_body.y >= 255)
+		{
+			is_jumping = false;
+			if (fast_drop)
+				fast_drop = false;
+			if (low_drop)
+				low_drop = false;
+			if (is_dropping)
+				is_dropping = false;
+			sonic_body.w = 82;
+			sonic_body.h = 100;
+			sonic_body.y = 235;
+		}
+		if (!fast_drop && !low_drop)
+		{
+			actual_acceleration_y = initial_acceleration_y;
+		}
+	}
+
+	/* CRIA NOVO OBSTÁCULO A CADA <obstacle_distance> PIXELS DE DISTÂNCIA */
+	struct SDL_Rect_Chained *obstacle = obstacles_list;
+	while (obstacle->next != NULL)
+	{
+		obstacle = obstacle->next;
+	}
+	if ((obstacle->body).x < (WINDOW_WIDTH - obstacle_distance))
+	{
+		obstacle->next = (struct SDL_Rect_Chained *)malloc(sizeof(struct SDL_Rect_Chained));
+		obstacle->next->next = NULL;
+		(obstacle->next->body).x = WINDOW_WIDTH;
+		(obstacle->next->body).y = 255;
+		(obstacle->next->body).w = 60;
+		(obstacle->next->body).h = 80;
+	}
+
+	/* DESALOCA OBSTÁCULO QUANDO ELE SAI DA TELA */
+	if ((obstacles_list->body).x < -60)
+	{
+		struct SDL_Rect_Chained *obstacle_to_destroy;
+		obstacle_to_destroy = obstacles_list;
+		obstacles_list = obstacles_list->next;
+		free(obstacle_to_destroy);
+	}
+
+	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
+	if (background_body.x <= -WINDOW_WIDTH)
+		background_body.x = 0;
+	i_background += (background_speed + background_acceleration * (time / 1000)) * (dt / 1000.0);
+	if (i_background >= 1)
+	{
+		background_body.x -= (int)i_background;
+		i_background -= (int)i_background;
+	}
+	if (ground_body.x <= -WINDOW_WIDTH)
+		ground_body.x = 0;
+	i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
+	if (i_ground >= 1)
+	{
+		struct SDL_Rect_Chained *temp = obstacles_list;
+		while (temp != NULL)
+		{
+			(temp->body).x -= (int)i_ground;
+			temp = temp->next;
+		}
+		ground_body.x -= (int)i_ground;
+		i_ground -= (int)i_ground;
+	}
+
+	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
+	if (time > stage_time * 1000 && stage == 1)
+	{
+		stage = 2;
+	}
+
+	/* ATUALIZA SPRITE */
+	sprite_time += dt;
+	if (sprite_time >= 1000 / sprites_per_second)
+	{
+		if (is_jumping)
+		{
+			sonic_sprite = 12 + ((sonic_sprite + 3) % 7);
+		}
+		else
+		{
+			switch (stage)
+			{
+			case 1:
+				sonic_sprite = (sonic_sprite + 1) % 8;
+				break;
+			case 2:
+				sonic_sprite = 8 + (sonic_sprite + 1) % 4;
+				sprites_per_second = 20;
+				break;
+			}
+		}
+		sprite_time = 0;
+	}
+}
+
+void draw()
 {
 	SDL_RenderCopy(renderer, background, NULL, &background_body);
 	SDL_RenderCopy(renderer, ground, NULL, &ground_body);
 	SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
 	struct SDL_Rect_Chained *temp = obstacles_list;
-	while(temp != NULL)
+	while (temp != NULL)
 	{
 		SDL_RenderCopy(renderer, obstacle, NULL, &(temp->body));
 		temp = temp->next;
 	}
 
 	SDL_RenderPresent(renderer);
-}
-
-void updateGame(Uint32 dt)
-{
-	while (true)
-	{
-
-		dt = SDL_GetTicks() - time;
-		time = SDL_GetTicks();
-		if (SDL_PollEvent(&event))
-		{
-			low_drop = false;
-			keyDown(&event);
-		}
-	
-		if (is_finishing)
-		{
-			Mix_PlayChannel(-1, sound_crash, 0);
-			Mix_VolumeMusic(15);
-			SDL_Delay(2000);
-			exitGame();
-			break;
-		}
-
-		/* ATUALIZA POSIÇÃO Y DO SONIC NO PULO */
-		if (is_jumping)
-		{
-			i_jump += actual_speed_y * (dt/1000.0);
-			actual_speed_y += actual_acceleration_y * (dt/1000.0);
-			
-			if (actual_speed_y < 0) is_dropping = true;
-
-			if (i_jump > 1 || i_jump < 1)
-			{
-				sonic_body.y -= (int)i_jump;
-				i_jump -= (int)i_jump;
-			}
-			if (sonic_body.y >= 255)
-			{
-				is_jumping = false;
-				if (fast_drop) fast_drop = false;
-				if (low_drop) low_drop = false;
-				if (is_dropping) is_dropping = false;
-				sonic_body.w = 82;
-				sonic_body.h = 100;
-				sonic_body.y = 235;
-			}	
-			if (!fast_drop && !low_drop) {
-				actual_acceleration_y = initial_acceleration_y;
-			}
-		}
-
-		/* CRIA NOVO OBSTÁCULO A CADA <obstacle_distance> PIXELS DE DISTÂNCIA */
-		struct SDL_Rect_Chained *temp = obstacles_list;
-		while (temp->next != NULL)
-		{
-			temp = temp->next;
-		}
-		if ((temp->body).x < (640 - obstacle_distance))
-		{
-			temp->next = (struct SDL_Rect_Chained *) malloc(sizeof(struct SDL_Rect_Chained *));
-			temp->next->next = NULL;
-			(temp->next->body).x = 640;
-			(temp->next->body).y = 255;
-			(temp->next->body).w = 60;
-			(temp->next->body).h = 80;
-		}
-
-		/* DESALOCA OBSTÁCULO QUANDO ELE SAI DA TELA */
-		if ((obstacles_list->body).x < -60)
-		{
-			temp = obstacles_list;
-			obstacles_list = obstacles_list->next;
-			free(temp);
-		}
-
-		/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
-		if (background_body.x <= -640)
-			background_body.x = 0;
-		i_background += (background_speed + background_acceleration * (time/1000)) * (dt/1000.0);
-		if (i_background >= 1)
-		{
-			background_body.x -= (int)i_background;
-			i_background -= (int)i_background;
-		}
-		if (ground_body.x <= -640)
-			ground_body.x = 0;
-		i_ground += (ground_speed + ground_acceleration * (time/1000)) * (dt/1000.0);
-		if (i_ground >= 1)
-		{
-			struct SDL_Rect_Chained *temp = obstacles_list;
-			while (temp != NULL)
-			{
-				(temp->body).x -= (int)i_ground;
-				temp = temp->next;				
-			}
-			ground_body.x -= (int)i_ground;
-			i_ground -= (int)i_ground;
-		}
-
-		/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
-		if (time > stage_time*1000 && stage == 1)
-		{
-			stage = 2;
-		}
-
-		/* ATUALIZA SPRITE */
-		sprite_time += dt;
-		if (sprite_time >= 1000/sprites_per_second)
-		{
-			if (is_jumping)
-			{
-				sonic_sprite = 12 + ((sonic_sprite + 3) % 7);
-			}
-			else
-			{
-				switch (stage)
-				{
-				case 1:
-					sonic_sprite = (sonic_sprite + 1) % 8;
-					break;
-				case 2:
-					sonic_sprite = 8 + (sonic_sprite + 1) % 4;
-					sprites_per_second = 20;
-					break;
-				}
-			}
-			sprite_time = 0;
-		}
-
-		/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
-		temp = obstacles_list;
-		if ((temp->body).x <= 155 && (temp->body).x >= 30)
-		{
-			if (is_jumping)
-			{
-				if ((temp->body).y <= sonic_body.y + 75)
-				{
-					is_finishing = true;
-				}
-			}
-			else
-			{
-				is_finishing = true;
-			}
-		}
-
-		drawGame();
-	}
 }
