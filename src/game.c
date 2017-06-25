@@ -10,7 +10,6 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <math.h>
 #include "engine/game.h"
 
@@ -205,7 +204,6 @@ bool is_colliding(int x, int y)
 			y2 = (-b - sqrt(delta)) / 2;
 			if ((y1 >= y && y1 <= y+15) || (y2 >= y && y2 <= y+15))
 			{
-				printf("aqui 1\n");
 				return true;
 			}
 		}
@@ -221,7 +219,6 @@ bool is_colliding(int x, int y)
 			x2 = (-b - sqrt(delta)) / 2;
 			if ((x1 >= x && x1 <= x+60) || (x2 >= x && x2 <= x+60))
 			{
-				printf("aqui 3\n");
 				return true;
 			}
 		}
