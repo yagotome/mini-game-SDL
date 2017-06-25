@@ -10,7 +10,6 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include "engine/game.h"
-#include "util.h"
 
 #define SONIC_AMOUNT 19
 #define WINDOW_WIDTH 640
@@ -32,7 +31,7 @@ typedef struct SDL_Rect_Chained SDL_Rect_Chained;
 typedef struct
 {
 	uint32_t score;
-	char score_str[12];
+	char score_str[11]; /* length of max number of uint32_t */
 	TTF_Font *font;
 	SDL_Color color;
 	SDL_Rect body;
@@ -86,9 +85,7 @@ void load()
 	TTF_Init();
 	score.font = TTF_OpenFont("../res/font/courier.ttf", 24);
 	score.color = white_color;
-	score.body.w = 440;
 	score.body.h = 40;
-	score.body.x = WINDOW_WIDTH - score.body.w - 16;
 	score.body.y = WINDOW_HEIGHT - score.body.h - 10;
 }
 
@@ -288,13 +285,8 @@ void update(Uint32 dt, Uint32 time)
 	/* ATUALIZA SCORE */
 	score.score = (uint32_t)(time/163);
 	sprintf(score.score_str, "%u", score.score);
-	char spaces[11 - strlen(score.score_str)];
-	for (i = 0; i < sizeof(spaces) - 1; i++) 
-	{
-		spaces[i] = ' ';
-	}
-	spaces[i] = '\0';
-	insert_str(score.score_str, sizeof(score.score_str), spaces, 0);
+	score.body.w = 40 * strlen(score.score_str);
+	score.body.x = WINDOW_WIDTH - score.body.w - 16;
 }
 
 void draw()
