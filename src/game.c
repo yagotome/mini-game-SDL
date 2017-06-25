@@ -10,6 +10,8 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <math.h>
 #include "engine/game.h"
 
 #define SONIC_AMOUNT 19
@@ -43,7 +45,7 @@ typedef struct
 
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 750.0, initial_acceleration_y = -1300.0;
 float i_background = 0.0, i_ground = 0.0, i_jump = 0.0, actual_speed_y = 0.0, actual_acceleration_y = 0.0, sprite_time = 0.0;
-const int obstacle_distance = 400, stage_time = 10;
+const int obstacle_distance = 400, stage_time = 10, sonic_radius = 37;
 int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
 bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false;
 
@@ -186,6 +188,51 @@ void on_sonic_crash()
 	finishTimeout(2000);
 }
 
+bool is_colliding(int x, int y)
+{
+	if (is_jumping)
+	{
+		int b, c, delta;
+
+		/* Reta x = 80 */
+		b = -2 * sonic_body.y - 86;
+		c = x * x - 246*x + sonic_body.y * sonic_body.y + 86 * sonic_body.y + 15609;
+		delta = b * b - 4 * c;
+		if (delta >= 0)
+		{
+			float y1, y2;
+			y1 = (-b + sqrt(delta)) / 2;
+			y2 = (-b - sqrt(delta)) / 2;
+			if ((y1 >= y && y1 <= y+15) || (y2 >= y && y2 <= y+15))
+			{
+				printf("aqui 1\n");
+				return true;
+			}
+		}
+
+		/* Reta y = 80 */
+		b = -246;
+		c = y * y - 2 * y * (sonic_body.y + 43) + sonic_body.y * sonic_body.y + 86 * sonic_body.y + 15609;
+		delta =  b * b - 4 * c;
+		if (delta >= 0)
+		{
+			float x1, x2;
+			x1 = (-b + sqrt(delta)) / 2;
+			x2 = (-b - sqrt(delta)) / 2;
+			if ((x1 >= x && x1 <= x+60) || (x2 >= x && x2 <= x+60))
+			{
+				printf("aqui 3\n");
+				return true;
+			}
+		}
+	}
+	else if (x + 4 <= 162 && x + 56 >= 162)
+	{
+		return true;
+	}
+	return false;
+}
+
 void update(Uint32 dt, Uint32 time)
 {
 	if (is_finishing)
@@ -194,13 +241,11 @@ void update(Uint32 dt, Uint32 time)
 	/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
 	SDL_Rect_Chained *first_obstacle;
 	first_obstacle = obstacles_list;
-	if ((first_obstacle->body).x <= 155 && (first_obstacle->body).x >= 30)
+	
+	if (is_colliding((first_obstacle->body).x, (first_obstacle->body).y))
 	{
-		if (!is_jumping || (first_obstacle->body).y <= sonic_body.y + 75)
-		{
-			on_sonic_crash();
-			return;
-		}
+		on_sonic_crash();
+		return;
 	}
 
 	/* ATUALIZA POSIÇÃO Y DO SONIC NO PULO */
