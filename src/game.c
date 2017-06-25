@@ -9,11 +9,15 @@
 #include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
+#include <string.h>
 #include "engine/game.h"
 
 #define SONIC_AMOUNT 19
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
+#define SCORE_HORIZONTAL_MARGIN 16
+#define SCORE_VERTICAL_MARGIN 10
+#define RECORD_FILE_NAME "record.txt"
 
 typedef enum {
 	false,
@@ -50,8 +54,9 @@ SDL_Rect_Chained *obstacles_list;
 SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
-Score score;
+Score score, record;
 const SDL_Color white_color = {255, 255, 255};
+const SDL_Color gold_color = {255, 255, 0};
 
 void load()
 {
@@ -86,7 +91,19 @@ void load()
 	score.font = TTF_OpenFont("../res/font/courier.ttf", 24);
 	score.color = white_color;
 	score.body.h = 40;
-	score.body.y = WINDOW_HEIGHT - score.body.h - 10;
+	score.body.y = WINDOW_HEIGHT - score.body.h - SCORE_VERTICAL_MARGIN;
+	
+	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
+	if (!fp) return;
+	fscanf(fp, "%s", record.score_str);
+	fclose(fp);
+	record.score = atoi(record.score_str);
+	record.font = score.font;
+	record.color = gold_color;
+	record.body.w = 20 * strlen(record.score_str);
+	record.body.h = 20;
+	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
+	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
 }
 
 void onExit()
@@ -150,6 +167,23 @@ void onKeyUp(const SDL_Event *event)
 	}
 }
 
+void on_sonic_crash()
+{
+	Mix_PlayChannel(-1, sound_crash, 0);
+	Mix_VolumeMusic(15);
+	is_finishing = true;
+	if (score.score > record.score)
+	{
+		FILE* fp = fopen(RECORD_FILE_NAME, "w");
+		if (fp)
+		{
+			fprintf(fp, "%s", score.score_str);
+			fclose(fp);
+		}
+	}
+	finishTimeout(2000);
+}
+
 void update(Uint32 dt, Uint32 time)
 {
 	if (is_finishing)
@@ -162,10 +196,7 @@ void update(Uint32 dt, Uint32 time)
 	{
 		if (!is_jumping || (first_obstacle->body).y <= sonic_body.y + 75)
 		{
-			Mix_PlayChannel(-1, sound_crash, 0);
-			Mix_VolumeMusic(15);
-			is_finishing = true;
-			finishTimeout(2000);
+			on_sonic_crash();
 			return;
 		}
 	}
@@ -286,7 +317,7 @@ void update(Uint32 dt, Uint32 time)
 	score.score = (uint32_t)(time/163);
 	sprintf(score.score_str, "%u", score.score);
 	score.body.w = 40 * strlen(score.score_str);
-	score.body.x = WINDOW_WIDTH - score.body.w - 16;
+	score.body.x = WINDOW_WIDTH - score.body.w - SCORE_HORIZONTAL_MARGIN;
 }
 
 void draw()
@@ -303,6 +334,9 @@ void draw()
 	SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);	
 	SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
 	SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
+	SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+	SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
+	SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
 
 	SDL_RenderPresent(renderer);
 }
