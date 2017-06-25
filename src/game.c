@@ -57,6 +57,8 @@ Mix_Chunk *sound_jump, *sound_crash;
 Score score, record;
 const SDL_Color white_color = {255, 255, 255};
 const SDL_Color gold_color = {255, 255, 0};
+SDL_Surface *score_surface, *record_surface;
+SDL_Texture *score_texture, *record_texture;
 
 void load()
 {
@@ -331,12 +333,27 @@ void draw()
 		SDL_RenderCopy(renderer, obstacle_texture, NULL, &(obstacle->body));
 		obstacle = obstacle->next;
 	}
-	SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);	
-	SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
+	SDL_Surface* last_score_surface = score_surface;
+	SDL_Texture* last_score_texture = score_texture;
+	score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);	
+	score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
 	SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
-	SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
-	SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
+
+	SDL_Surface* last_record_surface = record_surface;
+	SDL_Texture* last_record_texture = record_texture;
+	record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
 
 	SDL_RenderPresent(renderer);
+
+	if (last_score_surface)
+		SDL_FreeSurface(last_score_surface);
+	if (last_score_texture)
+		SDL_free(last_score_texture);
+		
+	if (last_record_surface)
+		SDL_FreeSurface(last_record_surface);
+	if (last_record_texture)
+		SDL_free(last_record_texture);
 }
