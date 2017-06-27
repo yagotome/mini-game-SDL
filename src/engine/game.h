@@ -16,3 +16,4 @@ void onKeyUp(const SDL_Event *event);
 void update(Uint32 dt, Uint32 time);
 void draw();
 void finishTimeout(int timeout);
+void treatKeyboardInput(const Uint8 *state);

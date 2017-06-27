@@ -134,9 +134,9 @@ void onExit()
 	SDL_Quit();
 }
 
-void onKeyDown(const SDL_Event *event)
+void treatKeyboardInput(const Uint8 *state)
 {
-	if (event->key.keysym.sym == SDLK_UP)
+	if (state[SDL_SCANCODE_UP] && !state[SDL_SCANCODE_DOWN])
 	{
 		if (!is_jumping)
 		{
@@ -155,7 +155,7 @@ void onKeyDown(const SDL_Event *event)
 			low_drop = true;
 		}
 	}
-	else if (event->key.keysym.sym == SDLK_DOWN && is_jumping)
+	if (state[SDL_SCANCODE_DOWN] && is_jumping)
 	{
 		actual_acceleration_y = -10000.0;
 		fast_drop = true;

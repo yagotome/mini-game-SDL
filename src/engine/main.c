@@ -5,7 +5,6 @@
 ----Autores: Lucas Alves de Sousa & Yago Gomes Tomé de Sousa----
 */
 
-#include <SDL2/SDL.h>
 #include "game.h"
 
 int timeToFinish = 0;
@@ -30,21 +29,20 @@ int main()
 		}
 
 		SDL_Event event;
-		if (SDL_PollEvent(&event))
+		while (SDL_PollEvent(&event))
 		{
 			switch (event.type) 
 			{
 				case SDL_QUIT:
 					onExit();
 					goto end_game_loop;
-				case SDL_KEYDOWN:
-					onKeyDown(&event);
-					break;
 				case SDL_KEYUP:
 					onKeyUp(&event);
 					break;
 			}
 		}
+
+		treatKeyboardInput(SDL_GetKeyboardState(NULL));
 
 		dt = SDL_GetTicks() - time;
 		time = SDL_GetTicks();
