@@ -44,7 +44,7 @@ typedef struct
 
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 750.0, initial_acceleration_y = -1300.0;
 float i_background = 0.0, i_ground = 0.0, i_jump = 0.0, actual_speed_y = 0.0, actual_acceleration_y = 0.0, sprite_time = 0.0;
-const int obstacle_distance = 400, stage_time = 10, sonic_radius = 37;
+const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
 int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
 bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false;
 
@@ -56,10 +56,10 @@ SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
 Score score, record;
-const SDL_Color white_color = {255, 255, 255};
+const SDL_Color black_color = {0, 0, 0};
 const SDL_Color gold_color = {255, 255, 0};
-SDL_Surface *score_surface, *record_surface;
-SDL_Texture *score_texture, *record_texture;
+SDL_Surface *record_surface;
+SDL_Texture *record_texture;
 
 void load()
 {
@@ -92,7 +92,7 @@ void load()
 	Mix_PlayMusic(bgm, -1);
 	TTF_Init();
 	score.font = TTF_OpenFont("../res/font/courier.ttf", 24);
-	score.color = white_color;
+	score.color = black_color;
 	score.body.h = 40;
 	score.body.y = WINDOW_HEIGHT - score.body.h - SCORE_VERTICAL_MARGIN;
 	
@@ -107,6 +107,8 @@ void load()
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
 	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
+	record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 }
 
 void onExit()
@@ -304,27 +306,31 @@ void update(Uint32 dt, Uint32 time)
 	}
 
 	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
-	if (background_body.x <= -WINDOW_WIDTH)
-		background_body.x = 0;
-	i_background += (background_speed + background_acceleration * (time / 1000)) * (dt / 1000.0);
-	if (i_background >= 1)
+	if(time <= max_time)
 	{
-		background_body.x -= (int)i_background;
-		i_background -= (int)i_background;
-	}
-	if (ground_body.x <= -WINDOW_WIDTH)
-		ground_body.x = 0;
-	i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
-	if (i_ground >= 1)
-	{
-		SDL_Rect_Chained *temp = obstacles_list;
-		while (temp != NULL)
+		if (background_body.x <= -WINDOW_WIDTH)
+			background_body.x = 0;
+		i_background += (background_speed + background_acceleration * (time / 1000)) * (dt / 1000.0);
+		if (i_background >= 1)
 		{
-			(temp->body).x -= (int)i_ground;
-			temp = temp->next;
+			background_body.x -= (int)i_background;
+			i_background -= (int)i_background;
 		}
-		ground_body.x -= (int)i_ground;
-		i_ground -= (int)i_ground;
+		if (ground_body.x <= -WINDOW_WIDTH)
+			ground_body.x = 0;
+		i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
+		if (i_ground >= 1)
+		{
+			SDL_Rect_Chained *temp = obstacles_list;
+			while (temp != NULL)
+			{
+				(temp->body).x -= (int)i_ground;
+				temp = temp->next;
+			}
+			ground_body.x -= (int)i_ground;
+			i_ground -= (int)i_ground;
+		}
+		//printf("%d\n", time);
 	}
 
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
@@ -380,10 +386,6 @@ void draw()
 	SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
 	SDL_FreeSurface(score_surface);
 	SDL_DestroyTexture(score_texture);
-	SDL_Surface * record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
-	SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
-	SDL_FreeSurface(record_surface);
-	SDL_DestroyTexture(record_texture);
 	SDL_RenderPresent(renderer);
 }
