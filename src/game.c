@@ -189,7 +189,7 @@ void on_sonic_crash()
 
 bool is_colliding(int x, int y)
 {
-	if (is_jumping && x <= 162 && x + 60 >= 162)
+	if (is_jumping && x <= 162 && x + 60 >= 102)
 	{
 		int b, c, delta;
 
