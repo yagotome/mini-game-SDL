@@ -42,11 +42,11 @@ typedef struct
 	SDL_Rect body;
 } Score;
 
-const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 750.0, initial_acceleration_y = -1300.0;
+const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 990.0, initial_acceleration_y = -2200.0;
 float i_background = 0.0, i_ground = 0.0, i_jump = 0.0, actual_speed_y = 0.0, actual_acceleration_y = 0.0, sprite_time = 0.0;
 const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
 int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
-bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false;
+bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false, moved = false;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -56,7 +56,7 @@ SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
 Score score, record;
-const SDL_Color black_color = {0, 0, 0};
+const SDL_Color black_color = {50, 50, 50};
 const SDL_Color gold_color = {255, 255, 0};
 SDL_Surface *record_surface;
 SDL_Texture *record_texture;
@@ -306,31 +306,38 @@ void update(Uint32 dt, Uint32 time)
 	}
 
 	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
-	if(time <= max_time)
+	i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
+	if (i_ground >= 1)
+	{
+		moved = true;
+		SDL_Rect_Chained *temp = obstacles_list;
+		while (temp != NULL)
+		{
+			(temp->body).x -= (int)i_ground;
+			temp = temp->next;
+		}
+		if (time <= max_time)
+		{
+			if (ground_body.x <= -WINDOW_WIDTH)
+			{
+				ground_body.x = 0;
+			}
+			ground_body.x -= (int)i_ground;
+			i_ground -= (int)i_ground;
+		}
+	}
+	if (time <= max_time)
 	{
 		if (background_body.x <= -WINDOW_WIDTH)
+		{
 			background_body.x = 0;
+		}
 		i_background += (background_speed + background_acceleration * (time / 1000)) * (dt / 1000.0);
 		if (i_background >= 1)
 		{
 			background_body.x -= (int)i_background;
 			i_background -= (int)i_background;
 		}
-		if (ground_body.x <= -WINDOW_WIDTH)
-			ground_body.x = 0;
-		i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
-		if (i_ground >= 1)
-		{
-			SDL_Rect_Chained *temp = obstacles_list;
-			while (temp != NULL)
-			{
-				(temp->body).x -= (int)i_ground;
-				temp = temp->next;
-			}
-			ground_body.x -= (int)i_ground;
-			i_ground -= (int)i_ground;
-		}
-		//printf("%d\n", time);
 	}
 
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
@@ -372,20 +379,25 @@ void update(Uint32 dt, Uint32 time)
 
 void draw()
 {
-	SDL_RenderCopy(renderer, background, NULL, &background_body);
-	SDL_RenderCopy(renderer, ground, NULL, &ground_body);
-	SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
-	SDL_Rect_Chained *obstacle = obstacles_list;
-	while (obstacle != NULL)
-	{
-		SDL_RenderCopy(renderer, obstacle_texture, NULL, &(obstacle->body));
-		obstacle = obstacle->next;
+	if (moved) {
+		SDL_RenderCopy(renderer, background, NULL, &background_body);
+		SDL_RenderCopy(renderer, ground, NULL, &ground_body);
+		SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
+
+		SDL_Rect_Chained *obstacle = obstacles_list;
+		while (obstacle != NULL)
+		{
+			SDL_RenderCopy(renderer, obstacle_texture, NULL, &(obstacle->body));
+			obstacle = obstacle->next;
+		}
+		
+		SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);
+		SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
+		SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
+		SDL_FreeSurface(score_surface);
+		SDL_DestroyTexture(score_texture);
+		SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
+		SDL_RenderPresent(renderer);
+		moved = false;
 	}
-	SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);
-	SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
-	SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
-	SDL_FreeSurface(score_surface);
-	SDL_DestroyTexture(score_texture);
-	SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
-	SDL_RenderPresent(renderer);
 }
