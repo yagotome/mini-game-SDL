@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 #include "engine/game.h"
 
 #define SONIC_AMOUNT 19
@@ -45,14 +46,15 @@ typedef struct
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 990.0, initial_acceleration_y = -2200.0;
 float i_background = 0.0, i_ground = 0.0, i_jump = 0.0, actual_speed_y = 0.0, actual_acceleration_y = 0.0, sprite_time = 0.0;
 const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
-int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0;
-bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false, moved = false;
+int stage = 1, sonic_sprite = 0, sprites_per_second = 15, i = 0, last_time_star = 0, time_to_special = 5, time_list[] = {10, 20, 30, 40};
+
+bool is_finishing = false, is_jumping = false, is_dropping = false, fast_drop = false, low_drop = false, moved = false, star_passing = false;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
-SDL_Rect background_body = {0, 0, 1280, 330}, ground_body = {0, 330, 1280, 150}, sonic_body = {80, 235, 82, 100};
+SDL_Rect background_body = {0, 0, 1280, 330}, ground_body = {0, 330, 1280, 150}, sonic_body = {80, 235, 82, 100}, star_body = {WINDOW_WIDTH, 50, 30, 30};
 SDL_Rect_Chained *obstacles_list;
-SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture;
+SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture, *star;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
 Score score, record;
@@ -63,18 +65,20 @@ SDL_Texture *record_texture;
 
 void load()
 {
+	srand(time(NULL));
 	SDL_Init(SDL_INIT_EVERYTHING);
 	window = SDL_CreateWindow("Sonic, jump!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 	renderer = SDL_CreateRenderer(window, -1, 0);
 	obstacles_list = (SDL_Rect_Chained *)malloc(sizeof(SDL_Rect_Chained));
 	obstacles_list->next = NULL;
-	(obstacles_list->body).x = 640;
+	(obstacles_list->body).x = WINDOW_WIDTH;
 	(obstacles_list->body).y = 255;
 	(obstacles_list->body).w = 60;
 	(obstacles_list->body).h = 80;
 	background = IMG_LoadTexture(renderer, "../res/img/background.jpg");
 	ground = IMG_LoadTexture(renderer, "../res/img/ground.jpg");
 	obstacle_texture = IMG_LoadTexture(renderer, "../res/img/obstacle.png");
+	star = IMG_LoadTexture(renderer, "../res/img/star.png");
 	int i;
 	for (i = 0; i < SONIC_AMOUNT; i++)
 	{
@@ -116,6 +120,7 @@ void onExit()
 	free(background);
 	free(ground);
 	free(obstacle_texture);
+	free(star);
 	int i;
 	for (i = 0; i < SONIC_AMOUNT; i++)
 	{
@@ -240,7 +245,6 @@ void update(Uint32 dt, Uint32 time)
 	/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
 	SDL_Rect_Chained *first_obstacle;
 	first_obstacle = obstacles_list;
-	
 	if (is_colliding((first_obstacle->body).x, (first_obstacle->body).y))
 	{
 		on_sonic_crash();
@@ -305,6 +309,15 @@ void update(Uint32 dt, Uint32 time)
 		free(obstacle_to_destroy);
 	}
 
+	/* DECIDE SE ESTRELA DO ESPECIAL VAI APARECER */
+	if (round((time - last_time_star)/1000.0) >= time_to_special)
+	{
+		star_passing = true;
+		last_time_star = time;
+		time_to_special = time_list[rand() % 4];
+		printf("APARECE ESTRELA: %d\n", time);
+	}
+
 	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
 	i_ground += (ground_speed + ground_acceleration * (time / 1000)) * (dt / 1000.0);
 	if (i_ground >= 1)
@@ -339,6 +352,19 @@ void update(Uint32 dt, Uint32 time)
 			i_background -= (int)i_background;
 		}
 	}
+	if (star_passing && time <= max_time)
+	{
+		printf("%d - %d\n", star_body.x, star_body.w);
+		if (star_body.x <= -star_body.w)
+		{
+			star_body.x = WINDOW_WIDTH;
+			star_passing = false;
+		}
+		else
+		{
+			star_body.x -= (int)i_ground;
+		}
+	}
 
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
 	if (time > stage_time * 1000 && stage == 1)
@@ -358,13 +384,13 @@ void update(Uint32 dt, Uint32 time)
 		{
 			switch (stage)
 			{
-			case 1:
-				sonic_sprite = (sonic_sprite + 1) % 8;
-				break;
-			case 2:
-				sonic_sprite = 8 + (sonic_sprite + 1) % 4;
-				sprites_per_second = 20;
-				break;
+				case 1:
+					sonic_sprite = (sonic_sprite + 1) % 8;
+					break;
+				case 2:
+					sonic_sprite = 8 + (sonic_sprite + 1) % 4;
+					sprites_per_second = 20;
+					break;
 			}
 		}
 		sprite_time = 0;
@@ -383,6 +409,7 @@ void draw()
 		SDL_RenderCopy(renderer, background, NULL, &background_body);
 		SDL_RenderCopy(renderer, ground, NULL, &ground_body);
 		SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
+		SDL_RenderCopy(renderer, star, NULL, &star_body);
 
 		SDL_Rect_Chained *obstacle = obstacles_list;
 		while (obstacle != NULL)
