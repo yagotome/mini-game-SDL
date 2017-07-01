@@ -19,7 +19,8 @@
 #define SCORE_HORIZONTAL_MARGIN 16
 #define SCORE_VERTICAL_MARGIN 10
 #define RECORD_FILE_NAME "record.txt"
-#define min(a, b) (a < b ? a : b)
+#define MIN(a, b) (a < b ? a : b)
+#define SQR(x) ((x)*(x))
 #define TIME_LIST_LEN 10
 
 typedef enum {
@@ -45,10 +46,11 @@ typedef struct
 } Text;
 
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 990.0, initial_acceleration_y = -2200.0;
-float i_background, i_ground, i_jump, actual_speed_y, actual_acceleration_y, sprite_time;
+float i_background, i_ground, i_jump, actual_speed_y, actual_acceleration_y, sprite_time, game_speed;
 const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
-int stage, sonic_sprite, sprites_per_second, i, timeToIgnore, last_time_star, time_to_special, time_list[TIME_LIST_LEN];
-bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record, changed_star, star_passing, initial_screen, gameover_screen;
+int stage, sonic_sprite, sprites_per_second, i, timeToIgnore, time_to_star_appears, time_list[TIME_LIST_LEN];
+bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record, changed_star, star_passing, initial_screen, gameover_screen, is_special, star_hit, sonic_blink;
+Uint32 last_time_star, special_timeout;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -99,7 +101,7 @@ void initEverything()
 	score.color = grey_color;
 	score.body.h = 40;
 	score.body.y = WINDOW_HEIGHT - score.body.h - SCORE_VERTICAL_MARGIN;
-	
+
 	sonic_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
 	sonic_text.color = blue_color;
 	sprintf(sonic_text.value_str, "Sonic,");
@@ -144,14 +146,15 @@ void initEverything()
 	gameover_screen = false;
 
 	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
-	if (!fp) return;
+	if (!fp)
+		return;
 	fscanf(fp, "Best: %s", record.value_str);
 	fclose(fp);
 	record.score = atoi(record.value_str);
 	i = 0;
 	do
 	{
-		record.value_str[i+5] = record.value_str[i];
+		record.value_str[i + 5] = record.value_str[i];
 	} while (record.value_str[i++] != '\0');
 	record.value_str[0] = 'B';
 	record.value_str[1] = 'e';
@@ -169,13 +172,13 @@ void initEverything()
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
 	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
-	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
+	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
 
 	for (i = 0; i < TIME_LIST_LEN; i++)
 	{
-		time_list[i] = (i+5) * 3;
+		time_list[i] = (i + 5) * 3;
 	}
 }
 
@@ -203,11 +206,12 @@ void beginGame()
 	actual_speed_y = 0.0;
 	actual_acceleration_y = 0.0;
 	sprite_time = 0.0;
+	game_speed = 1.0;
 	stage = 1;
 	sonic_sprite = 0;
 	sprites_per_second = 15;
 	i = 0;
-	time_to_special = time_list[rand() % TIME_LIST_LEN];
+	time_to_star_appears = time_list[rand() % TIME_LIST_LEN];
 	changed_sonic = true;
 	sonic_body.w = 82;
 	sonic_body.h = 100;
@@ -218,6 +222,9 @@ void beginGame()
 	low_drop = false;
 	is_playing = true;
 	star_passing = false;
+	is_special = false;
+	star_hit = false;
+	sonic_blink = false;
 	timeToIgnore = SDL_GetTicks();
 }
 
@@ -267,14 +274,15 @@ void resetScreen()
 	toreset_text.body.x = 510;
 
 	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
-	if (!fp) return;
+	if (!fp)
+		return;
 	fscanf(fp, "Best: %s", record.value_str);
 	fclose(fp);
 	record.score = atoi(record.value_str);
 	int i = 0;
 	do
 	{
-		record.value_str[i+5] = record.value_str[i];
+		record.value_str[i + 5] = record.value_str[i];
 	} while (record.value_str[i++] != '\0');
 	record.value_str[0] = 'B';
 	record.value_str[1] = 'e';
@@ -287,7 +295,7 @@ void resetScreen()
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
 	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
-	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
+	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
 }
@@ -384,14 +392,14 @@ bool is_colliding(int x, int y)
 
 		/* Reta x = 80 */
 		b = -2 * sonic_body.y - 86;
-		c = x * x - 246*x + sonic_body.y * sonic_body.y + 86 * sonic_body.y + 15609;
+		c = x * x - 246 * x + sonic_body.y * sonic_body.y + 86 * sonic_body.y + 15609;
 		delta = b * b - 4 * c;
 		if (delta >= 0)
 		{
 			float y1, y2;
 			y1 = (-b + sqrt(delta)) / 2;
 			y2 = (-b - sqrt(delta)) / 2;
-			if ((y1 >= y && y1 <= y+15) || (y2 >= y && y2 <= y+15))
+			if ((y1 >= y && y1 <= y + 15) || (y2 >= y && y2 <= y + 15))
 			{
 				return true;
 			}
@@ -400,13 +408,13 @@ bool is_colliding(int x, int y)
 		/* Reta y = 80 */
 		b = -246;
 		c = y * y - 2 * y * (sonic_body.y + 43) + sonic_body.y * sonic_body.y + 86 * sonic_body.y + 15609;
-		delta =  b * b - 4 * c;
+		delta = b * b - 4 * c;
 		if (delta >= 0)
 		{
 			float x1, x2;
 			x1 = (-b + sqrt(delta)) / 2;
 			x2 = (-b - sqrt(delta)) / 2;
-			if ((x1 >= x && x1 <= x+60) || (x2 >= x && x2 <= x+60))
+			if ((x1 >= x && x1 <= x + 60) || (x2 >= x && x2 <= x + 60))
 			{
 				return true;
 			}
@@ -419,24 +427,90 @@ bool is_colliding(int x, int y)
 	return false;
 }
 
+bool is_colliding_circles(const SDL_Rect *rect1, const SDL_Rect *rect2)
+{	
+	typedef struct
+	{
+		int x;
+		int y;
+	} Point;
+	typedef struct
+	{
+		Point center;
+		int r;
+	} Circle;
+	Circle c1, c2;
+	c1.center.x = (int)round((2*rect1->x + rect1->w)/2.);
+	c1.center.y = (int)round((2*rect1->y + rect1->h)/2.);
+	c1.r = (int)round(rect1->w/2.);
+	
+	c2.center.x = (int)round((2*rect2->x + rect2->w)/2.);
+	c2.center.y = (int)round((2*rect2->y + rect2->h)/2.);
+	c2.r = (int)round(rect2->w/2.);
+
+	Circle *cg, *cl;
+	if (c1.r > c2.r)
+	{
+		cg = &c1;
+		cl = &c2;
+	}
+	else
+	{		
+		cg = &c2;
+		cl = &c1;
+	}
+
+	int theta;
+	for (theta = 0; theta < 360; theta++)
+	{
+		int xbl = (int)round(cl->center.x + cl->r * cos(theta)); // x of border of lower circle
+		int ybl = (int)round(cl->center.y + cl->r * sin(theta)); // y of border of lower circle
+
+		int d = sqrt(SQR(cg->center.x - cl->center.x) + SQR(cg->center.y - cl->center.y));
+		if (d <= cg->r)
+			return true;
+	}
+	return false;
+}
+
 void update(Uint32 dt, Uint32 time)
 {
-	/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
-	if(is_playing)
+	if (is_playing)
 	{
+		/* VERIFICA COLISÃO ENTRE SONIC E O PRIMEIRO OBSTÁCULO DA LISTA */
 		SDL_Rect_Chained *first_obstacle;
 		first_obstacle = obstacles_list;
-		
-		if (is_colliding((first_obstacle->body).x, (first_obstacle->body).y))
+
+		if (!is_special && is_colliding((first_obstacle->body).x, (first_obstacle->body).y))
 		{
 			on_sonic_crash();
 			return;
 		}
 
-		// if (is_colliding(star_body.x, star_body.y))
-		// {
-		// 	printf("ESPECIAL\n");
-		// }
+		/* TRATA FIM DO ESPECIAL: DESACELERA O JOGO E QUANDO ESTIVER QUASE ACABANDO SONIC VOLTA A CORRER NORMALMENTE */
+		if (is_special && time >= special_timeout - 3000)
+		{
+			Uint32 diff = special_timeout - time;
+			if (diff <= 1000)
+			{
+				game_speed = 1.0;
+				stage = 2;
+			}
+			else 
+				game_speed = diff / 1000.0;
+			if (diff <= 0)
+				is_special = false;
+		}
+
+		/* VERIFICA SE SONIC PEGOU A ESTRELA DO ESPECIAL */
+		if (is_jumping && is_colliding_circles(&sonic_body, &star_body))
+		{
+			is_special = true;
+			special_timeout = time + 5000 + 1000*(rand() % 7);
+			game_speed = 4.0;
+			star_hit = true;
+			stage = 3;
+		}
 	}
 
 	/* ATUALIZA POSIÇÃO Y DO SONIC NO PULO */
@@ -474,7 +548,7 @@ void update(Uint32 dt, Uint32 time)
 	}
 
 	/* CRIA NOVO OBSTÁCULO A CADA <obstacle_distance> PIXELS DE DISTÂNCIA */
-	if(is_playing)
+	if (is_playing)
 	{
 		SDL_Rect_Chained *obstacle = obstacles_list;
 		while (obstacle->next != NULL)
@@ -505,14 +579,15 @@ void update(Uint32 dt, Uint32 time)
 	}
 
 	/* DECIDE SE ESTRELA DO ESPECIAL VAI APARECER */
-	if (!is_playing) {
+	if (!is_playing)
+	{
 		last_time_star = time;
 	}
-	else if (round((time - last_time_star)/1000.0) >= time_to_special)
+	else if (round((time - last_time_star) / 1000.0) >= time_to_star_appears)
 	{
 		star_passing = true;
 		last_time_star = time;
-		time_to_special = time_list[rand() % TIME_LIST_LEN];
+		time_to_star_appears = time_list[rand() % TIME_LIST_LEN];
 	}
 
 	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
@@ -520,8 +595,8 @@ void update(Uint32 dt, Uint32 time)
 	{
 		if (is_playing)
 		{
-			i_ground += (ground_speed + ground_acceleration * (min((time-timeToIgnore), max_time) / 1000)) * (dt / 1000.0);
-			i_background += (background_speed + background_acceleration * (min((time-timeToIgnore), max_time) / 1000)) * (dt / 1000.0);
+			i_ground += (ground_speed + ground_acceleration * (MIN((time - timeToIgnore), max_time) / 1000)) * (dt / 1000.0) * game_speed;
+			i_background += (background_speed + background_acceleration * (MIN((time - timeToIgnore), max_time) / 1000)) * (dt / 1000.0) * game_speed;
 		}
 		else
 		{
@@ -560,15 +635,17 @@ void update(Uint32 dt, Uint32 time)
 	}
 	if (star_passing)
 	{
+		if (star_hit) star_body.x = -star_body.w;
 		if (star_body.x <= -star_body.w)
 		{
 			star_body.x = WINDOW_WIDTH;
 			star_passing = false;
 			changed_star = false;
+			star_hit = false;
 		}
 		else
-		{			
-			star_body.x -= 1;
+		{
+			star_body.x -= (int)round(game_speed);
 			changed_star = true;
 		}
 	}
@@ -576,7 +653,7 @@ void update(Uint32 dt, Uint32 time)
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
 	if (is_playing)
 	{
-		if ((time-timeToIgnore) > stage_time * 1000 && stage == 1)
+		if ((time - timeToIgnore) > stage_time * 1000 && stage == 1)
 		{
 			stage = 2;
 		}
@@ -600,19 +677,24 @@ void update(Uint32 dt, Uint32 time)
 						sonic_sprite = 8 + (sonic_sprite + 1) % 4;
 						sprites_per_second = 20;
 						break;
+					case 3:
+						sonic_sprite = 12 + ((sonic_sprite + 3) % 7);
+						sprites_per_second = 35;
+						break;
 				}
 			}
 			sprite_time = 0;
 			changed_sonic = true;
+			if (is_special) sonic_blink = !sonic_blink;
 		}
 	}
 
 	/* ATUALIZA SCORE */
 	if (is_playing)
 	{
-		if (score.score != (uint32_t)((time-timeToIgnore)/163))
+		if (score.score != (uint32_t)((time - timeToIgnore) / 163))
 		{
-			score.score = (uint32_t)((time-timeToIgnore)/163);
+			score.score = (uint32_t)((time - timeToIgnore) / 163);
 			sprintf(score.value_str, "%u", score.score);
 			score.body.w = 40 * strlen(score.value_str);
 			score.body.x = WINDOW_WIDTH - score.body.w - SCORE_HORIZONTAL_MARGIN;
@@ -630,7 +712,8 @@ void draw()
 		SDL_RenderCopy(renderer, star, NULL, &star_body);
 		if (is_playing || is_crashing)
 		{
-			SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
+			if (!is_special || !sonic_blink)
+				SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
 			SDL_Rect_Chained *obstacle = obstacles_list;
 			while (obstacle != NULL)
 			{
@@ -643,7 +726,7 @@ void draw()
 			SDL_FreeSurface(score_surface);
 			SDL_DestroyTexture(score_texture);
 		}
-		SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
+		SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);
 		SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 		SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
 		SDL_FreeSurface(record_surface);
@@ -653,66 +736,66 @@ void draw()
 			SDL_Rect begin_sonic = {80, 158, 140, 178};
 			SDL_RenderCopy(renderer, sonic_begin, NULL, &begin_sonic);
 
-			SDL_Surface *sonic_text_surface = TTF_RenderText_Solid(sonic_text.font, sonic_text.value_str, sonic_text.color);	
+			SDL_Surface *sonic_text_surface = TTF_RenderText_Solid(sonic_text.font, sonic_text.value_str, sonic_text.color);
 			SDL_Texture *sonic_text_texture = SDL_CreateTextureFromSurface(renderer, sonic_text_surface);
 			SDL_RenderCopy(renderer, sonic_text_texture, NULL, &sonic_text.body);
 			SDL_FreeSurface(sonic_text_surface);
 			SDL_DestroyTexture(sonic_text_texture);
 
-			SDL_Surface *jump_text_surface = TTF_RenderText_Solid(jump_text.font, jump_text.value_str, jump_text.color);	
+			SDL_Surface *jump_text_surface = TTF_RenderText_Solid(jump_text.font, jump_text.value_str, jump_text.color);
 			SDL_Texture *jump_text_texture = SDL_CreateTextureFromSurface(renderer, jump_text_surface);
 			SDL_RenderCopy(renderer, jump_text_texture, NULL, &jump_text.body);
 			SDL_FreeSurface(jump_text_surface);
 			SDL_DestroyTexture(jump_text_texture);
 
-			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);	
+			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);
 			SDL_Texture *presskey_text_texture = SDL_CreateTextureFromSurface(renderer, presskey_text_surface);
 			SDL_RenderCopy(renderer, presskey_text_texture, NULL, &presskey_text.body);
 			SDL_FreeSurface(presskey_text_surface);
 			SDL_DestroyTexture(presskey_text_texture);
 
-			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);	
+			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);
 			SDL_Texture *upordown_text_texture = SDL_CreateTextureFromSurface(renderer, upordown_text_surface);
 			SDL_RenderCopy(renderer, upordown_text_texture, NULL, &upordown_text.body);
 			SDL_FreeSurface(upordown_text_surface);
 			SDL_DestroyTexture(upordown_text_texture);
 
-			SDL_Surface *toplay_text_surface = TTF_RenderText_Solid(toplay_text.font, toplay_text.value_str, toplay_text.color);	
+			SDL_Surface *toplay_text_surface = TTF_RenderText_Solid(toplay_text.font, toplay_text.value_str, toplay_text.color);
 			SDL_Texture *toplay_text_texture = SDL_CreateTextureFromSurface(renderer, toplay_text_surface);
 			SDL_RenderCopy(renderer, toplay_text_texture, NULL, &toplay_text.body);
 			SDL_FreeSurface(toplay_text_surface);
 			SDL_DestroyTexture(toplay_text_texture);
 		}
-		else if(gameover_screen)
+		else if (gameover_screen)
 		{
 			SDL_Rect gameover_sonic = {80, 196, 140, 140};
 			SDL_RenderCopy(renderer, sonic_gameover, NULL, &gameover_sonic);
 
-			SDL_Surface *game_text_surface = TTF_RenderText_Solid(game_text.font, game_text.value_str, game_text.color);	
+			SDL_Surface *game_text_surface = TTF_RenderText_Solid(game_text.font, game_text.value_str, game_text.color);
 			SDL_Texture *game_text_texture = SDL_CreateTextureFromSurface(renderer, game_text_surface);
 			SDL_RenderCopy(renderer, game_text_texture, NULL, &game_text.body);
 			SDL_FreeSurface(game_text_surface);
 			SDL_DestroyTexture(game_text_texture);
 
-			SDL_Surface *over_text_surface = TTF_RenderText_Solid(over_text.font, over_text.value_str, over_text.color);	
+			SDL_Surface *over_text_surface = TTF_RenderText_Solid(over_text.font, over_text.value_str, over_text.color);
 			SDL_Texture *over_text_texture = SDL_CreateTextureFromSurface(renderer, over_text_surface);
 			SDL_RenderCopy(renderer, over_text_texture, NULL, &over_text.body);
 			SDL_FreeSurface(over_text_surface);
 			SDL_DestroyTexture(over_text_texture);
 
-			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);	
+			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);
 			SDL_Texture *presskey_text_texture = SDL_CreateTextureFromSurface(renderer, presskey_text_surface);
 			SDL_RenderCopy(renderer, presskey_text_texture, NULL, &presskey_text.body);
 			SDL_FreeSurface(presskey_text_surface);
 			SDL_DestroyTexture(presskey_text_texture);
 
-			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);	
+			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);
 			SDL_Texture *upordown_text_texture = SDL_CreateTextureFromSurface(renderer, upordown_text_surface);
 			SDL_RenderCopy(renderer, upordown_text_texture, NULL, &upordown_text.body);
 			SDL_FreeSurface(upordown_text_surface);
 			SDL_DestroyTexture(upordown_text_texture);
 
-			SDL_Surface *toreset_text_surface = TTF_RenderText_Solid(toreset_text.font, toreset_text.value_str, toreset_text.color);	
+			SDL_Surface *toreset_text_surface = TTF_RenderText_Solid(toreset_text.font, toreset_text.value_str, toreset_text.color);
 			SDL_Texture *toreset_text_texture = SDL_CreateTextureFromSurface(renderer, toreset_text_surface);
 			SDL_RenderCopy(renderer, toreset_text_texture, NULL, &toreset_text.body);
 			SDL_FreeSurface(toreset_text_surface);
