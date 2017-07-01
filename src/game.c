@@ -233,6 +233,10 @@ void resetScreen()
 {
 	gameover_screen = true;
 	is_crashing = false;
+	star_passing = false;
+	changed_star = false;
+	star_hit = false;
+	star_body.x = WINDOW_WIDTH;
 
 	game_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
 	game_text.color = grey_color;
@@ -622,6 +626,22 @@ void update(Uint32 dt, Uint32 time)
 					(temp->body).x -= (int)i_ground;
 					temp = temp->next;
 				}
+				if(star_passing)
+				{
+					if (star_hit) star_body.x = -star_body.w;
+					if (star_body.x <= -star_body.w)
+					{
+						star_body.x = WINDOW_WIDTH;
+						star_passing = false;
+						changed_star = false;
+						star_hit = false;
+					}
+					else
+					{
+						star_body.x -= (int)i_ground;
+						changed_star = true;
+					}
+				}
 			}
 			ground_body.x -= (int)i_ground;
 			i_ground -= (int)i_ground;
@@ -637,19 +657,7 @@ void update(Uint32 dt, Uint32 time)
 
 	if (is_playing && star_passing)
 	{
-		if (star_hit) star_body.x = -star_body.w;
-		if (star_body.x <= -star_body.w)
-		{
-			star_body.x = WINDOW_WIDTH;
-			star_passing = false;
-			changed_star = false;
-			star_hit = false;
-		}
-		else
-		{
-			star_body.x -= (int)round(dt*game_speed);
-			changed_star = true;
-		}
+		
 	}
 
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
