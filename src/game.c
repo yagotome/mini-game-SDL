@@ -9,7 +9,6 @@
 #include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 #include "engine/game.h"
 
@@ -37,17 +36,17 @@ typedef struct SDL_Rect_Chained SDL_Rect_Chained;
 typedef struct
 {
 	uint32_t score;
-	char score_str[11]; /* length of max number of uint32_t */
+	char value_str[11]; /* length of max number of uint32_t */
 	TTF_Font *font;
 	SDL_Color color;
 	SDL_Rect body;
-} Score;
+} Text;
 
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 990.0, initial_acceleration_y = -2200.0;
 float i_background, i_ground, i_jump, actual_speed_y, actual_acceleration_y, sprite_time;
 const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
 int stage, sonic_sprite, sprites_per_second, i, timeToIgnore;
-bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record;
+bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record, initial_screen, gameover_screen;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -56,11 +55,15 @@ SDL_Rect_Chained *obstacles_list;
 SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture;
 Mix_Music *bgm;
 Mix_Chunk *sound_jump, *sound_crash;
-Score score, record;
-const SDL_Color black_color = {50, 50, 50};
-const SDL_Color gold_color = {255, 255, 0};
+Text score, record, sonic_text, jump_text, presskey_text, upordown_text, toplay_text, game_text, over_text, toreset_text;
+const SDL_Color grey_color = {50, 50, 50};
+const SDL_Color green_color = {0, 255, 0};
+const SDL_Color blue_color = {0, 0, 255};
+const SDL_Color red_color = {255, 0, 0};
 SDL_Surface *record_surface;
 SDL_Texture *record_texture;
+SDL_Texture *sonic_begin;
+SDL_Texture *sonic_gameover;
 
 void initEverything()
 {
@@ -77,7 +80,8 @@ void initEverything()
 		sprintf(sonic_path, "../res/img/sonic_%02d.png", i + 1);
 		sonic[i] = IMG_LoadTexture(renderer, sonic_path);
 	}
-	SDL_Texture * sonic_begin = IMG_LoadTexture(renderer, "../res/img/sonic_begin.png");
+	sonic_begin = IMG_LoadTexture(renderer, "../res/img/sonic_begin.png");
+	sonic_gameover = IMG_LoadTexture(renderer, "../res/img/sonic_gameover.png");
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 	bgm = Mix_LoadMUS("../res/audio/sonic_theme.mp3");
 	sound_jump = Mix_LoadWAV("../res/audio/jump.wav");
@@ -88,28 +92,72 @@ void initEverything()
 	Mix_PlayMusic(bgm, -1);
 	TTF_Init();
 	score.font = TTF_OpenFont("../res/font/courier.ttf", 24);
-	score.color = black_color;
+	score.color = grey_color;
 	score.body.h = 40;
 	score.body.y = WINDOW_HEIGHT - score.body.h - SCORE_VERTICAL_MARGIN;
 	
+	sonic_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
+	sonic_text.color = blue_color;
+	sprintf(sonic_text.value_str, "Sonic,");
+	sonic_text.body.h = 40;
+	sonic_text.body.y = 130;
+	sonic_text.body.w = 240;
+	sonic_text.body.x = 260;
+
+	jump_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
+	jump_text.color = red_color;
+	sprintf(jump_text.value_str, "jump!");
+	jump_text.body.h = 40;
+	jump_text.body.y = 180;
+	jump_text.body.w = 200;
+	jump_text.body.x = 400;
+
+	presskey_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	presskey_text.color = grey_color;
+	sprintf(presskey_text.value_str, "Press key");
+	presskey_text.body.h = 40;
+	presskey_text.body.y = 260;
+	presskey_text.body.w = 120;
+	presskey_text.body.x = 250;
+
+	upordown_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	upordown_text.color = grey_color;
+	sprintf(upordown_text.value_str, "UP or DOWN");
+	upordown_text.body.h = 40;
+	upordown_text.body.y = 260;
+	upordown_text.body.w = 120;
+	upordown_text.body.x = 380;
+
+	toplay_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	toplay_text.color = grey_color;
+	sprintf(toplay_text.value_str, "to play");
+	toplay_text.body.h = 40;
+	toplay_text.body.y = 260;
+	toplay_text.body.w = 84;
+	toplay_text.body.x = 510;
+
 	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
 	if (!fp) return;
-	fscanf(fp, "%s", record.score_str);
+	fscanf(fp, "Best: %s", record.value_str);
 	fclose(fp);
-	record.score = atoi(record.score_str);
+	record.score = atoi(record.value_str);
 	record.font = score.font;
-	record.color = gold_color;
-	record.body.w = 20 * strlen(record.score_str);
+	record.color = green_color;
+	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
 	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
-	record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
+	initial_screen = true;
+	gameover_screen = false;
 }
 
 void beginGame()
 {
+	initial_screen = false;
+	gameover_screen = false;
 	SDL_Rect_Chained *temp = obstacles_list;
 	while (temp != NULL)
 	{
@@ -148,21 +196,70 @@ void beginGame()
 
 void resetScreen()
 {
+	gameover_screen = true;
 	is_crashing = false;
 	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
 	if (!fp) return;
-	fscanf(fp, "%s", record.score_str);
+	fscanf(fp, "Best: %s", record.value_str);
 	fclose(fp);
-	record.score = atoi(record.score_str);
+	record.score = atoi(record.value_str);
+	record.value_str[5] = record.value_str[0];
+	record.value_str[6] = record.value_str[1];
+	record.value_str[7] = '\0';
+	record.value_str[0] = 'B';
+	record.value_str[1] = 'e';
+	record.value_str[2] = 's';
+	record.value_str[3] = 't';
+	record.value_str[4] = ':';
 	record.font = score.font;
-	record.color = gold_color;
-	record.body.w = 20 * strlen(record.score_str);
+	record.color = green_color;
+	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
 	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
-	record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
+
+	game_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
+	game_text.color = grey_color;
+	sprintf(game_text.value_str, "Game");
+	game_text.body.h = 40;
+	game_text.body.y = 130;
+	game_text.body.w = 160;
+	game_text.body.x = 260;
+
+	over_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
+	over_text.color = grey_color;
+	sprintf(over_text.value_str, "Over! =(");
+	over_text.body.h = 40;
+	over_text.body.y = 180;
+	over_text.body.w = 200;
+	over_text.body.x = 370;
+
+	presskey_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	presskey_text.color = grey_color;
+	sprintf(presskey_text.value_str, "Press key");
+	presskey_text.body.h = 40;
+	presskey_text.body.y = 260;
+	presskey_text.body.w = 120;
+	presskey_text.body.x = 250;
+
+	upordown_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	upordown_text.color = grey_color;
+	sprintf(upordown_text.value_str, "UP or DOWN");
+	upordown_text.body.h = 40;
+	upordown_text.body.y = 260;
+	upordown_text.body.w = 120;
+	upordown_text.body.x = 380;
+
+	toreset_text.font = TTF_OpenFont("../res/font/courier.ttf", 24);
+	toreset_text.color = grey_color;
+	sprintf(toreset_text.value_str, "to reset");
+	toreset_text.body.h = 40;
+	toreset_text.body.y = 260;
+	toreset_text.body.w = 84;
+	toreset_text.body.x = 510;
 }
 
 void onExit()
@@ -236,10 +333,10 @@ void on_sonic_crash()
 	Mix_VolumeMusic(15);
 	if (score.score > record.score)
 	{
-		FILE* fp = fopen(RECORD_FILE_NAME, "w");
+		FILE *fp = fopen(RECORD_FILE_NAME, "w");
 		if (fp)
 		{
-			fprintf(fp, "%s", score.score_str);
+			fprintf(fp, "Best: %s", score.value_str);
 			fclose(fp);
 		}
 	}
@@ -455,8 +552,8 @@ void update(Uint32 dt, Uint32 time)
 		if (score.score != (uint32_t)((time-timeToIgnore)/163))
 		{
 			score.score = (uint32_t)((time-timeToIgnore)/163);
-			sprintf(score.score_str, "%u", score.score);
-			score.body.w = 40 * strlen(score.score_str);
+			sprintf(score.value_str, "%u", score.score);
+			score.body.w = 40 * strlen(score.value_str);
 			score.body.x = WINDOW_WIDTH - score.body.w - SCORE_HORIZONTAL_MARGIN;
 			changed_score = true;
 		}
@@ -478,17 +575,87 @@ void draw()
 				SDL_RenderCopy(renderer, obstacle_texture, NULL, &(obstacle->body));
 				obstacle = obstacle->next;
 			}
-			SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);
+			SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.value_str, score.color);
 			SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
 			SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
 			SDL_FreeSurface(score_surface);
 			SDL_DestroyTexture(score_texture);
 		}
-		SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+		SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
 		SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 		SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
 		SDL_FreeSurface(record_surface);
 		SDL_DestroyTexture(record_texture);
+		if (initial_screen)
+		{
+			SDL_Rect begin_sonic = {80, 158, 140, 178};
+			SDL_RenderCopy(renderer, sonic_begin, NULL, &begin_sonic);
+
+			SDL_Surface *sonic_text_surface = TTF_RenderText_Solid(sonic_text.font, sonic_text.value_str, sonic_text.color);	
+			SDL_Texture *sonic_text_texture = SDL_CreateTextureFromSurface(renderer, sonic_text_surface);
+			SDL_RenderCopy(renderer, sonic_text_texture, NULL, &sonic_text.body);
+			SDL_FreeSurface(sonic_text_surface);
+			SDL_DestroyTexture(sonic_text_texture);
+
+			SDL_Surface *jump_text_surface = TTF_RenderText_Solid(jump_text.font, jump_text.value_str, jump_text.color);	
+			SDL_Texture *jump_text_texture = SDL_CreateTextureFromSurface(renderer, jump_text_surface);
+			SDL_RenderCopy(renderer, jump_text_texture, NULL, &jump_text.body);
+			SDL_FreeSurface(jump_text_surface);
+			SDL_DestroyTexture(jump_text_texture);
+
+			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);	
+			SDL_Texture *presskey_text_texture = SDL_CreateTextureFromSurface(renderer, presskey_text_surface);
+			SDL_RenderCopy(renderer, presskey_text_texture, NULL, &presskey_text.body);
+			SDL_FreeSurface(presskey_text_surface);
+			SDL_DestroyTexture(presskey_text_texture);
+
+			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);	
+			SDL_Texture *upordown_text_texture = SDL_CreateTextureFromSurface(renderer, upordown_text_surface);
+			SDL_RenderCopy(renderer, upordown_text_texture, NULL, &upordown_text.body);
+			SDL_FreeSurface(upordown_text_surface);
+			SDL_DestroyTexture(upordown_text_texture);
+
+			SDL_Surface *toplay_text_surface = TTF_RenderText_Solid(toplay_text.font, toplay_text.value_str, toplay_text.color);	
+			SDL_Texture *toplay_text_texture = SDL_CreateTextureFromSurface(renderer, toplay_text_surface);
+			SDL_RenderCopy(renderer, toplay_text_texture, NULL, &toplay_text.body);
+			SDL_FreeSurface(toplay_text_surface);
+			SDL_DestroyTexture(toplay_text_texture);
+		}
+		else if(gameover_screen)
+		{
+			SDL_Rect gameover_sonic = {80, 196, 140, 140};
+			SDL_RenderCopy(renderer, sonic_gameover, NULL, &gameover_sonic);
+
+			SDL_Surface *game_text_surface = TTF_RenderText_Solid(game_text.font, game_text.value_str, game_text.color);	
+			SDL_Texture *game_text_texture = SDL_CreateTextureFromSurface(renderer, game_text_surface);
+			SDL_RenderCopy(renderer, game_text_texture, NULL, &game_text.body);
+			SDL_FreeSurface(game_text_surface);
+			SDL_DestroyTexture(game_text_texture);
+
+			SDL_Surface *over_text_surface = TTF_RenderText_Solid(over_text.font, over_text.value_str, over_text.color);	
+			SDL_Texture *over_text_texture = SDL_CreateTextureFromSurface(renderer, over_text_surface);
+			SDL_RenderCopy(renderer, over_text_texture, NULL, &over_text.body);
+			SDL_FreeSurface(over_text_surface);
+			SDL_DestroyTexture(over_text_texture);
+
+			SDL_Surface *presskey_text_surface = TTF_RenderText_Solid(presskey_text.font, presskey_text.value_str, presskey_text.color);	
+			SDL_Texture *presskey_text_texture = SDL_CreateTextureFromSurface(renderer, presskey_text_surface);
+			SDL_RenderCopy(renderer, presskey_text_texture, NULL, &presskey_text.body);
+			SDL_FreeSurface(presskey_text_surface);
+			SDL_DestroyTexture(presskey_text_texture);
+
+			SDL_Surface *upordown_text_surface = TTF_RenderText_Solid(upordown_text.font, upordown_text.value_str, upordown_text.color);	
+			SDL_Texture *upordown_text_texture = SDL_CreateTextureFromSurface(renderer, upordown_text_surface);
+			SDL_RenderCopy(renderer, upordown_text_texture, NULL, &upordown_text.body);
+			SDL_FreeSurface(upordown_text_surface);
+			SDL_DestroyTexture(upordown_text_texture);
+
+			SDL_Surface *toreset_text_surface = TTF_RenderText_Solid(toreset_text.font, toreset_text.value_str, toreset_text.color);	
+			SDL_Texture *toreset_text_texture = SDL_CreateTextureFromSurface(renderer, toreset_text_surface);
+			SDL_RenderCopy(renderer, toreset_text_texture, NULL, &toreset_text.body);
+			SDL_FreeSurface(toreset_text_surface);
+			SDL_DestroyTexture(toreset_text_texture);
+		}
 		SDL_RenderPresent(renderer);
 		changed_background = false;
 		changed_ground = false;
