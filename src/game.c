@@ -634,7 +634,8 @@ void update(Uint32 dt, Uint32 time)
 			changed_background = true;
 		}
 	}
-	if (star_passing)
+
+	if (is_playing && star_passing)
 	{
 		if (star_hit) star_body.x = -star_body.w;
 		if (star_body.x <= -star_body.w)
@@ -646,7 +647,7 @@ void update(Uint32 dt, Uint32 time)
 		}
 		else
 		{
-			star_body.x -= (int)round(game_speed);
+			star_body.x -= (int)round(dt*game_speed);
 			changed_star = true;
 		}
 	}
