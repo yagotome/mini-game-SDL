@@ -4,6 +4,8 @@ uint8_t buf[8] = {
 #define BUT1_PIN 2 //sobe
 #define BUT2_PIN 3 //desce
 
+bool released1 = true, released2 = true;
+
 void setup() 
 {
   Serial.begin(9600);
@@ -19,16 +21,24 @@ void setup()
 void loop() 
 {
   int state1 = digitalRead(BUT1_PIN);
-  if (state1 != 1) {
+  if (state1 != 1 && released1) {
     buf[2] = 81;   // up key
     Serial.write(buf, 8); // Send keypress
-  } 
+    released1 = false;
+  }
+  if (!released1 && state1 == 1) {
+    released1 = true;
+  }
 
   int state2 = digitalRead(BUT2_PIN);
-  if (state2 != 1) {
+  if (state2 != 1 && released2) {
     buf[2] = 82;   // down key
     Serial.write(buf, 8); // Send keypress
-  } 
+    released2 = false;
+  }
+  if (!released2 && state2 == 1) {
+    released2 = true;
+  }
 
   if (state1 == 1 && state2 == 1)
   {
