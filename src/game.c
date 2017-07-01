@@ -167,7 +167,7 @@ void initEverything()
 		record.value_str[6] = '\0';
 	}
 	record.font = score.font;
-	record.color = green_color;
+	record.color = blue_color;
 	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
@@ -290,7 +290,7 @@ void resetScreen()
 	record.value_str[3] = 't';
 	record.value_str[4] = ':';
 	record.font = score.font;
-	record.color = green_color;
+	record.color = blue_color;
 	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
