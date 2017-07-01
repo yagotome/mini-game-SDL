@@ -504,7 +504,12 @@ void update(Uint32 dt, Uint32 time)
 			else 
 				game_speed = diff / 1000.0;
 			if (diff <= 0)
+			{
 				is_special = false;
+				sonic_body.w = 82;
+				sonic_body.h = 100;
+				sonic_body.y = 235;
+			}
 		}
 
 		/* VERIFICA SE SONIC PEGOU A ESTRELA DO ESPECIAL */
@@ -655,11 +660,6 @@ void update(Uint32 dt, Uint32 time)
 		}
 	}
 
-	if (is_playing && star_passing)
-	{
-		
-	}
-
 	/* NOVO BLOCO DE SPRITES QUANDO TEMPO DE JOGO > 10 SEGUNDOS */
 	if (is_playing)
 	{
@@ -690,6 +690,9 @@ void update(Uint32 dt, Uint32 time)
 					case 3:
 						sonic_sprite = 12 + ((sonic_sprite + 3) % 7);
 						sprites_per_second = 35;
+						sonic_body.w = 80;
+						sonic_body.h = 80;
+						sonic_body.y = 255;
 						break;
 				}
 			}
