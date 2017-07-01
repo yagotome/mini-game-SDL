@@ -136,11 +136,29 @@ void initEverything()
 	toplay_text.body.w = 84;
 	toplay_text.body.x = 510;
 
+	initial_screen = true;
+	gameover_screen = false;
+
 	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
 	if (!fp) return;
 	fscanf(fp, "Best: %s", record.value_str);
 	fclose(fp);
 	record.score = atoi(record.value_str);
+	i = 0;
+	do
+	{
+		record.value_str[i+5] = record.value_str[i];
+	} while (record.value_str[i++] != '\0');
+	record.value_str[0] = 'B';
+	record.value_str[1] = 'e';
+	record.value_str[2] = 's';
+	record.value_str[3] = 't';
+	record.value_str[4] = ':';
+	if (i == 1)
+	{
+		record.value_str[5] = '0';
+		record.value_str[6] = '\0';
+	}
 	record.font = score.font;
 	record.color = green_color;
 	record.body.w = 20 * strlen(record.value_str);
@@ -150,8 +168,6 @@ void initEverything()
 	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
-	initial_screen = true;
-	gameover_screen = false;
 }
 
 void beginGame()
@@ -198,28 +214,6 @@ void resetScreen()
 {
 	gameover_screen = true;
 	is_crashing = false;
-	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
-	if (!fp) return;
-	fscanf(fp, "Best: %s", record.value_str);
-	fclose(fp);
-	record.score = atoi(record.value_str);
-	record.value_str[5] = record.value_str[0];
-	record.value_str[6] = record.value_str[1];
-	record.value_str[7] = '\0';
-	record.value_str[0] = 'B';
-	record.value_str[1] = 'e';
-	record.value_str[2] = 's';
-	record.value_str[3] = 't';
-	record.value_str[4] = ':';
-	record.font = score.font;
-	record.color = green_color;
-	record.body.w = 20 * strlen(record.value_str);
-	record.body.h = 20;
-	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
-	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
-	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
-	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
-	changed_record = true;
 
 	game_text.font = TTF_OpenFont("../res/font/courier.ttf", 40);
 	game_text.color = grey_color;
@@ -260,6 +254,31 @@ void resetScreen()
 	toreset_text.body.y = 260;
 	toreset_text.body.w = 84;
 	toreset_text.body.x = 510;
+
+	FILE *fp = fopen(RECORD_FILE_NAME, "a+");
+	if (!fp) return;
+	fscanf(fp, "Best: %s", record.value_str);
+	fclose(fp);
+	record.score = atoi(record.value_str);
+	int i = 0;
+	do
+	{
+		record.value_str[i+5] = record.value_str[i];
+	} while (record.value_str[i++] != '\0');
+	record.value_str[0] = 'B';
+	record.value_str[1] = 'e';
+	record.value_str[2] = 's';
+	record.value_str[3] = 't';
+	record.value_str[4] = ':';
+	record.font = score.font;
+	record.color = green_color;
+	record.body.w = 20 * strlen(record.value_str);
+	record.body.h = 20;
+	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
+	record.body.y = WINDOW_HEIGHT - record.body.h - SCORE_HORIZONTAL_MARGIN;
+	record_surface = TTF_RenderText_Solid(record.font, record.value_str, record.color);	
+	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
+	changed_record = true;
 }
 
 void onExit()
