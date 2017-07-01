@@ -21,6 +21,7 @@
 #define SCORE_VERTICAL_MARGIN 10
 #define RECORD_FILE_NAME "record.txt"
 #define min(a, b) (a < b ? a : b)
+#define TIME_LIST_LEN 10
 
 typedef enum {
 	false,
@@ -47,12 +48,12 @@ typedef struct
 const float background_speed = 50.0, background_acceleration = 2.0, ground_speed = 200.0, ground_acceleration = 8.0, initial_speed_y = 990.0, initial_acceleration_y = -2200.0;
 float i_background, i_ground, i_jump, actual_speed_y, actual_acceleration_y, sprite_time;
 const int obstacle_distance = 400, stage_time = 15, sonic_radius = 37, max_time = 140000;
-int stage, sonic_sprite, sprites_per_second, i, timeToIgnore, last_time_star = 0, time_to_special = 5, time_list[] = {10, 20, 30, 40};
-bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record, star_passing = false;
+int stage, sonic_sprite, sprites_per_second, i, timeToIgnore, last_time_star, time_to_special, time_list[TIME_LIST_LEN];
+bool is_playing, is_crashing, is_jumping, is_dropping, fast_drop, low_drop, changed_background, changed_ground, changed_sonic, changed_score, changed_record, changed_star, star_passing;
 
 SDL_Window *window;
 SDL_Renderer *renderer;
-SDL_Rect background_body = {0, 0, 1280, 330}, ground_body = {0, 330, 1280, 150}, sonic_body = {80, 235, 82, 100}, star_body = {WINDOW_WIDTH, 50, 30, 30};
+SDL_Rect background_body = {0, 0, 1280, 330}, ground_body = {0, 330, 1280, 150}, sonic_body = {80, 235, 82, 100}, star_body = {WINDOW_WIDTH, 50, 40, 40};
 SDL_Rect_Chained *obstacles_list;
 SDL_Texture *background, *ground, *sonic[SONIC_AMOUNT], *obstacle_texture, *star;
 Mix_Music *bgm;
@@ -109,6 +110,11 @@ void initEverything()
 	record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
 	record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
 	changed_record = true;
+
+	for (i = 0; i < TIME_LIST_LEN; i++)
+	{
+		time_list[i] = (i+5) * 3;
+	}
 }
 
 void beginGame()
@@ -137,6 +143,7 @@ void beginGame()
 	sonic_sprite = 0;
 	sprites_per_second = 15;
 	i = 0;
+	time_to_special = time_list[rand() % TIME_LIST_LEN];
 	changed_sonic = true;
 	sonic_body.w = 82;
 	sonic_body.h = 100;
@@ -146,6 +153,7 @@ void beginGame()
 	fast_drop = false;
 	low_drop = false;
 	is_playing = true;
+	star_passing = false;
 	timeToIgnore = SDL_GetTicks();
 }
 
@@ -308,6 +316,11 @@ void update(Uint32 dt, Uint32 time)
 			on_sonic_crash();
 			return;
 		}
+
+		// if (is_colliding(star_body.x, star_body.y))
+		// {
+		// 	printf("ESPECIAL\n");
+		// }
 	}
 
 	/* ATUALIZA POSIÇÃO Y DO SONIC NO PULO */
@@ -376,12 +389,14 @@ void update(Uint32 dt, Uint32 time)
 	}
 
 	/* DECIDE SE ESTRELA DO ESPECIAL VAI APARECER */
-	if (round((time - last_time_star)/1000.0) >= time_to_special)
+	if (!is_playing) {
+		last_time_star = time;
+	}
+	else if (round((time - last_time_star)/1000.0) >= time_to_special)
 	{
 		star_passing = true;
 		last_time_star = time;
-		time_to_special = time_list[rand() % 4];
-		printf("APARECE ESTRELA: %d\n", time);
+		time_to_special = time_list[rand() % TIME_LIST_LEN];
 	}
 
 	/* ATUALIZA POSIÇÃO X DO PLANO DE FUNDO, CHÃO E OBSTÁCULOS */
@@ -427,17 +442,18 @@ void update(Uint32 dt, Uint32 time)
 			changed_background = true;
 		}
 	}
-	if (star_passing && time <= max_time)
+	if (star_passing)
 	{
-		printf("%d - %d\n", star_body.x, star_body.w);
 		if (star_body.x <= -star_body.w)
 		{
 			star_body.x = WINDOW_WIDTH;
 			star_passing = false;
+			changed_star = false;
 		}
 		else
-		{
-			star_body.x -= (int)i_ground;
+		{			
+			star_body.x -= 1;
+			changed_star = true;
 		}
 	}
 
@@ -491,10 +507,11 @@ void update(Uint32 dt, Uint32 time)
 
 void draw()
 {
-	if (changed_background || changed_ground || changed_sonic || changed_score || changed_record)
+	if (changed_background || changed_ground || changed_sonic || changed_score || changed_record || changed_star)
 	{
 		SDL_RenderCopy(renderer, background, NULL, &background_body);
 		SDL_RenderCopy(renderer, ground, NULL, &ground_body);
+		SDL_RenderCopy(renderer, star, NULL, &star_body);
 		if (is_playing || is_crashing)
 		{
 			SDL_RenderCopy(renderer, sonic[sonic_sprite], NULL, &sonic_body);
@@ -521,5 +538,6 @@ void draw()
 		changed_sonic = false;
 		changed_score = false;
 		changed_record = false;
+		changed_star = false;
 	}
 }
