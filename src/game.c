@@ -396,9 +396,13 @@ void draw()
 		SDL_Surface *score_surface = TTF_RenderText_Solid(score.font, score.score_str, score.color);
 		SDL_Texture *score_texture = SDL_CreateTextureFromSurface(renderer, score_surface);
 		SDL_RenderCopy(renderer, score_texture, NULL, &score.body);
-		SDL_RenderCopy(renderer, record_texture, NULL, &score.body);
 		SDL_FreeSurface(score_surface);
 		SDL_DestroyTexture(score_texture);
+		SDL_Surface *record_surface = TTF_RenderText_Solid(record.font, record.score_str, record.color);	
+		SDL_Texture *record_texture = SDL_CreateTextureFromSurface(renderer, record_surface);
+		SDL_RenderCopy(renderer, record_texture, NULL, &record.body);
+		SDL_FreeSurface(record_surface);
+		SDL_DestroyTexture(record_texture);
 		SDL_RenderPresent(renderer);
 		changed_background = false;
 		changed_ground = false;
