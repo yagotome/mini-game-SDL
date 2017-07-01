@@ -9,7 +9,9 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_mixer.h>
 
-void load();
+void initEverything();
+void beginGame();
+void resetScreen();
 void onExit();
 void onKeyDown(const SDL_Event *event);
 void onKeyUp(const SDL_Event *event);

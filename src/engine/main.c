@@ -15,7 +15,7 @@ void finishTimeout(int timeout) {
 
 int main()
 {
-	load();
+	initEverything();
 
 	Uint32 dt;
 	Uint32 time = SDL_GetTicks();
@@ -24,8 +24,8 @@ int main()
 	{
 		if (timeToFinish && time >= timeToFinish)
 		{
-			onExit();
-			break;
+			resetScreen();
+			timeToFinish = 0;
 		}
 
 		SDL_Event event;
