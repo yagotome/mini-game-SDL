@@ -64,7 +64,6 @@ const SDL_Color grey_color = {50, 50, 50};
 const SDL_Color green_color = {0, 255, 0};
 const SDL_Color blue_color = {0, 0, 255};
 const SDL_Color red_color = {255, 0, 0};
-const SDL_Color yellow_color = {255, 255, 0};
 SDL_Surface *record_surface;
 SDL_Texture *record_texture;
 SDL_Texture *sonic_begin;
@@ -168,7 +167,7 @@ void initEverything()
 		record.value_str[6] = '\0';
 	}
 	record.font = score.font;
-	record.color = yellow_color;
+	record.color = blue_color;
 	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
@@ -295,7 +294,7 @@ void resetScreen()
 	record.value_str[3] = 't';
 	record.value_str[4] = ':';
 	record.font = score.font;
-	record.color = yellow_color;
+	record.color = blue_color;
 	record.body.w = 20 * strlen(record.value_str);
 	record.body.h = 20;
 	record.body.x = 0 + SCORE_HORIZONTAL_MARGIN;
@@ -506,9 +505,12 @@ void update(Uint32 dt, Uint32 time)
 			if (diff <= 0)
 			{
 				is_special = false;
-				sonic_body.w = 82;
-				sonic_body.h = 100;
-				sonic_body.y = 235;
+				if(sonic_body.y == 255)
+				{
+					sonic_body.w = 82;
+					sonic_body.h = 100;
+					sonic_body.y = 235;
+				}
 			}
 		}
 
