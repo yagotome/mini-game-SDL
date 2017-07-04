@@ -49,3 +49,5 @@ Again, briefly bridge the reset pin with the ground and then:
 ### Developed by:
 * [Lucas Alves](https://github.com/lucascomp)
 * [Yago Tomé](https://github.com/yagotome)
+
+[Project's video](https://github.com/lucascomp/sonic-jump-arduino-sdl)
